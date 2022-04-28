@@ -182,12 +182,12 @@ struct sSpline
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
-class OneLoneCoder_RacingLine : public olc::PixelGameEngine
+class RacingTrack : public olc::PixelGameEngine
 {
 public:
-	OneLoneCoder_RacingLine()
+	RacingTrack()
 	{
-		sAppName = "Racing Line";
+		sAppName = "Racing Track";
 	}
 
 private:
@@ -309,7 +309,7 @@ protected:
 
 int main()
 {
-	OneLoneCoder_RacingLine demo;
+	RacingTrack demo;
 	demo.Construct(256, 240, 4, 4);
 	demo.Start();
 
