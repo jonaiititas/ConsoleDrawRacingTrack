@@ -1,6 +1,6 @@
 ConsoleDrawRacingTrack
 
-Main variables to change in the OneLoneCoder_RacingLine class:
+Main variables to change in the main RacingTrack class:
 * nNodes to change the number of red (controlable) nodes (currently at 15)
 * nNodesSpline to change the number of points in path and boundary splines (currently at 60)
 
