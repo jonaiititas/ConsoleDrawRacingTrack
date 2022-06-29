@@ -190,19 +190,18 @@ private:
 	int nSelectedNode = -1;
 	float fTrackWidth = 10.0f; // Width of the track
 
-	// Getter methods to access path, boundaries and number of points in a spline in main()
-public:
-	sSpline getPath()
+	void exportToCSV()
 	{
-		return pathFill;
-	}
-	sSpline getTrackInside()
-	{
-		return trackInside;
-	}
-	sSpline getTrackOutside()
-	{
-		return trackOutside;
+		ofstream fout("data/data.csv");
+
+		fout << "xPath" << "," << "yPath" << "," << "xOutside" << "," << "yOutside" << "," << "xInside" << "," << "yInside" << endl;
+		for (int i = 0; i < pathFill.points.size(); i += 1)
+		{
+			fout << pathFill.points[i].x << "," << pathFill.points[i].y << "," << trackOutside.points[i].x << "," << trackOutside.points[i].y
+				<< "," << trackInside.points[i].x << "," << trackInside.points[i].y << endl;
+		}
+
+		fout.close();
 	}
 
 protected:
@@ -235,7 +234,7 @@ protected:
 
 		FillRect(240, 220, 10, 10, olc::RED);
 
-		// Check if exit button is pressed
+		// Check if exit button is pressed and export the data to a CSV file
 		if (GetMouse(0).bHeld)
 		{
 			for (int i = 220; i < 230; i++)
@@ -245,6 +244,9 @@ protected:
 					if (GetMouseX() == p && GetMouseY() == i)
 					{
 						FillRect(240, 220, 10, 10, olc::DARK_RED);
+
+						exportToCSV();
+
 						olc_Terminate();
 					}
 				}
@@ -294,21 +296,6 @@ int main()
 	RacingTrack demo;
 	demo.Construct(256, 240, 4, 4);
 	demo.Start();
-
-	sSpline path = demo.getPath();
-	sSpline trackInside = demo.getTrackInside();
-	sSpline trackOutside = demo.getTrackOutside();
-
-	ofstream fout("data/data.csv");
-
-	fout << "xPath" << "," << "yPath" << "," << "xOutside" << "," << "yOutside" << "," << "xInside" << "," << "yInside" << endl;
-	for (int i = 0; i < path.points.size(); i += 1)
-	{
-		fout << path.points[i].x << "," << path.points[i].y << "," << trackOutside.points[i].x << "," << trackOutside.points[i].y
-			<< "," << trackInside.points[i].x << "," << trackInside.points[i].y << endl;
-	}
-
-	fout.close();
 
 	return 0;
 }
