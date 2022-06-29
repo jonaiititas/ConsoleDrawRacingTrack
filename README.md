@@ -7,4 +7,4 @@ Main variables to change in the main RacingTrack class:
 
 There is the main .cpp file to run and a header .h file which contains the console engine.
 
-I used Visual Studio IDE to compile to code. When you run the .cpp file, a console window should appear in which you draw the track. To close and save the track to a .csv file press the red button at the bottom-right corner.
+It is possible to use Visual Studio IDE to run the code if you want to tinker with the variables. When you run the .cpp file, a console window should appear in which you draw the track. However, you can also just use the .exe file in the main directory to run the code without any IDE. To close and save the track to a .csv file press the red button at the bottom-right corner. 
