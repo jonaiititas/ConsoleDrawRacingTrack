@@ -28,26 +28,16 @@ struct sSpline
 {
 	vector<sPoint2D> points;
 	float fTotalSplineLength = 0.0f;
-	bool bIsLooped = true;
 
 	sPoint2D GetSplinePoint(float t)
 	{
 		int p0, p1, p2, p3;
-		if (!bIsLooped)
-		{
-			p1 = (int)t + 1;
-			p2 = p1 + 1;
-			p3 = p2 + 1;
-			p0 = p1 - 1;
-		}
-		else
-		{
-			p1 = ((int)t) % points.size();
-			p2 = (p1 + 1) % points.size();
-			p3 = (p2 + 1) % points.size();
-			p0 = p1 >= 1 ? p1 - 1 : points.size() - 1;
-		}
 
+		p1 = ((int)t) % points.size();
+		p2 = (p1 + 1) % points.size();
+		p3 = (p2 + 1) % points.size();
+		p0 = p1 >= 1 ? p1 - 1 : points.size() - 1;
+	
 		t = t - (int)t;
 
 		float tt = t * t;
@@ -67,20 +57,11 @@ struct sSpline
 	sPoint2D GetSplineGradient(float t)
 	{
 		int p0, p1, p2, p3;
-		if (!bIsLooped)
-		{
-			p1 = (int)t + 1;
-			p2 = p1 + 1;
-			p3 = p2 + 1;
-			p0 = p1 - 1;
-		}
-		else
-		{
-			p1 = ((int)t) % points.size();
-			p2 = (p1 + 1) % points.size();
-			p3 = (p2 + 1) % points.size();
-			p0 = p1 >= 1 ? p1 - 1 : points.size() - 1;
-		}
+
+		p1 = ((int)t) % points.size();
+		p2 = (p1 + 1) % points.size();
+		p3 = (p2 + 1) % points.size();
+		p0 = p1 >= 1 ? p1 - 1 : points.size() - 1;
 
 		t = t - (int)t;
 
@@ -132,51 +113,62 @@ struct sSpline
 		return (float)i + (p / points[i].length);
 	}
 
-
 	void UpdateSplineProperties()
 	{
 		// Use to cache local spline lengths and overall spline length
 		fTotalSplineLength = 0.0f;
 
-		if (bIsLooped)
+		// Each node has a succeeding length
+		for (int i = 0; i < points.size(); i++)
 		{
-			// Each node has a succeeding length
-			for (int i = 0; i < points.size(); i++)
-			{
-				points[i].length = CalculateSegmentLength(i);
-				fTotalSplineLength += points[i].length;
-			}
-		}
-		else
-		{
-			for (int i = 1; i < points.size() - 2; i++)
-			{
-				points[i].length = CalculateSegmentLength(i);
-				fTotalSplineLength += points[i].length;
-			}
+			points[i].length = CalculateSegmentLength(i);
+			fTotalSplineLength += points[i].length;
 		}
 	}
 
-	void DrawSelf(olc::PixelGameEngine* gfx, float ox, float oy, float distance, olc::Pixel p = olc::WHITE)
+	void DrawSelf(olc::PixelGameEngine* gfx, olc::Pixel p = olc::WHITE)
 	{
-		if (bIsLooped)
+		for (float t = 0; t < (float)points.size(); t += 1)
 		{
-			for (float t = 0; t < (float)points.size() - 0; t += distance)
-			{
-				sPoint2D pos = GetSplinePoint(t);
-				gfx->Draw(pos.x, pos.y, p);
-			}
-		}
-		else // Not Looped
-		{
-			for (float t = 0; t < (float)points.size() - 3; t += distance)
-			{
-				sPoint2D pos = GetSplinePoint(t);
-				gfx->Draw(pos.x, pos.y, p);
-			}
+			sPoint2D pos = GetSplinePoint(t);
+			gfx->Draw(pos.x, pos.y, p);
 		}
 	}
 
+	void DrawPathSelf(olc::PixelGameEngine* gfx, float distance, sSpline &pathFill, olc::Pixel p = olc::WHITE)
+	{
+		int k = 0;
+		for (float t = 0; t < (float)points.size(); t += distance)
+		{
+			sPoint2D pos = GetSplinePoint(t);
+			pathFill.points[k] = pos;
+			k++;
+			gfx->Draw(pos.x, pos.y, p);
+		}
+	}
+
+	void DrawBoundariesSelf(olc::PixelGameEngine* gfx, sSpline pathFill, float fTrackWidth, olc::Pixel p)
+	{
+		for (float t = 0; t < (float)points.size(); t += 1.0)
+		{
+			sPoint2D p1 = pathFill.GetSplinePoint(t);
+			sPoint2D g1 = pathFill.GetSplineGradient(t);
+			float glen = sqrtf(g1.x * g1.x + g1.y * g1.y);
+
+			if (p == olc::YELLOW)
+			{
+				points[t].x = p1.x + fTrackWidth * (-g1.y / glen);
+				points[t].y = p1.y + fTrackWidth * (g1.x / glen);
+			}
+			else
+			{
+				points[t].x = p1.x - fTrackWidth * (-g1.y / glen);
+				points[t].y = p1.y - fTrackWidth * (g1.x / glen);
+			}
+
+			gfx->Draw(points[t].x, points[t].y, p);
+		}
+	}
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -191,22 +183,18 @@ public:
 	}
 
 private:
-	sSpline path, trackInside, trackOutside, racingLine;	// Various splines
+	sSpline path, pathFill, trackInside, trackOutside;	// Various splines
 
-	int nNodes = 15;	        // Number of red (controlable) nodes in spline
-	float nNodesSpline = 60.0f; // Number of total points in a spline
-
-	float fDisplacement[15]; // Displacement along spline node normal
-
-	int nIterations = 1;
-	float fMarker = 1.0f;
+	int nNodes = 15;	       // Number of red (controlable) nodes in spline
+	int nNodesSpline = 150;    // Number of total points in a spline
 	int nSelectedNode = -1;
+	float fTrackWidth = 10.0f; // Width of the track
 
 	// Getter methods to access path, boundaries and number of points in a spline in main()
 public:
 	sSpline getPath()
 	{
-		return path;
+		return pathFill;
 	}
 	sSpline getTrackInside()
 	{
@@ -215,10 +203,6 @@ public:
 	sSpline getTrackOutside()
 	{
 		return trackOutside;
-	}
-	float getNodesSpline()
-	{
-		return nNodesSpline;
 	}
 
 protected:
@@ -230,10 +214,13 @@ protected:
 			path.points.push_back(
 				{ 30.0f * sinf((float)i / (float)nNodes * 3.14159f * 2.0f) + ScreenWidth() / 2,
 				30.0f * cosf((float)i / (float)nNodes * 3.14159f * 2.0f) + ScreenHeight() / 2 });
+		}
 
+		for (int i = 0; i < nNodesSpline; i++)
+		{
+			pathFill.points.push_back({ 0.0f, 0.0f });
 			trackInside.points.push_back({ 0.0f, 0.0f });
-			trackOutside.points.push_back({ 0.0f, 0.0f });
-			racingLine.points.push_back({ 0.0f, 0.0f });
+		    trackOutside.points.push_back({ 0.0f, 0.0f });
 		}
 
 		path.UpdateSplineProperties();
@@ -246,6 +233,23 @@ protected:
 		// Clear Screen
 		FillRect(0, 0, ScreenWidth(), ScreenHeight(), olc::BLACK);
 
+		FillRect(240, 220, 10, 10, olc::RED);
+
+		// Check if exit button is pressed
+		if (GetMouse(0).bHeld)
+		{
+			for (int i = 220; i < 230; i++)
+			{
+				for (int p = 240; p < 250; p++)
+				{
+					if (GetMouseX() == p && GetMouseY() == i)
+					{
+						FillRect(240, 220, 10, 10, olc::DARK_RED);
+						olc_Terminate();
+					}
+				}
+			}
+		}
 
 		// Check if node is selected with mouse
 		if (GetMouse(0).bPressed)
@@ -272,33 +276,11 @@ protected:
 			path.UpdateSplineProperties();
 		}
 
-		// Calculate track boundary points
-		float fTrackWidth = 10.0f;
-		for (int i = 0; i < path.points.size(); i++)
-		{
-			sPoint2D p1 = path.GetSplinePoint(i);
-			sPoint2D g1 = path.GetSplineGradient(i);
-			float glen = sqrtf(g1.x * g1.x + g1.y * g1.y);
-
-			trackInside.points[i].x = p1.x + fTrackWidth * (-g1.y / glen);
-			trackInside.points[i].y = p1.y + fTrackWidth * (g1.x / glen);
-			trackOutside.points[i].x = p1.x - fTrackWidth * (-g1.y / glen);
-			trackOutside.points[i].y = p1.y - fTrackWidth * (g1.x / glen);
-		}
-
 		// Draw Track
-		float fRes = 0.2f;
-		for (float t = 0.0f; t < path.points.size(); t += fRes)
-		{
-			sPoint2D pl1 = trackInside.GetSplinePoint(t);
-			sPoint2D pr1 = trackOutside.GetSplinePoint(t);
-			sPoint2D pl2 = trackInside.GetSplinePoint(t + fRes);
-			sPoint2D pr2 = trackOutside.GetSplinePoint(t + fRes);
-		}
-
-		path.DrawSelf(this, 0, 0, (float)nNodes / nNodesSpline);
-		trackInside.DrawSelf(this, 0, 0, (float)nNodes / nNodesSpline, olc::YELLOW);
-		trackOutside.DrawSelf(this, 0, 0, (float)nNodes / nNodesSpline, olc::BLUE);
+		path.DrawSelf(this);
+		path.DrawPathSelf(this, (float)nNodes / (float)nNodesSpline, pathFill);
+		trackInside.DrawBoundariesSelf(this, pathFill, fTrackWidth, olc::BLUE);
+		trackOutside.DrawBoundariesSelf(this, pathFill, fTrackWidth, olc::YELLOW);
 
 		for (auto i : path.points)
 			FillPixels(i.x - 1, i.y - 1, i.x + 2, i.y + 2, olc::RED);
@@ -316,18 +298,14 @@ int main()
 	sSpline path = demo.getPath();
 	sSpline trackInside = demo.getTrackInside();
 	sSpline trackOutside = demo.getTrackOutside();
-	float nNodesSpline = demo.getNodesSpline();
-	float distance = (float)path.points.size() / nNodesSpline;
 
 	ofstream fout("data/data.csv");
 
 	fout << "xPath" << "," << "yPath" << "," << "xOutside" << "," << "yOutside" << "," << "xInside" << "," << "yInside" << endl;
-	for (float i = (float)path.points.size(); i > 0; i -= distance)
+	for (int i = 0; i < path.points.size(); i += 1)
 	{
-		sPoint2D p = path.GetSplinePoint(i);
-		sPoint2D inside = trackInside.GetSplinePoint(i);
-		sPoint2D outside = trackOutside.GetSplinePoint(i);
-		fout << p.x << "," << p.y << "," << inside.x << "," << inside.y << "," << outside.x << "," << outside.y << endl;
+		fout << path.points[i].x << "," << path.points[i].y << "," << trackOutside.points[i].x << "," << trackOutside.points[i].y
+			<< "," << trackInside.points[i].x << "," << trackInside.points[i].y << endl;
 	}
 
 	fout.close();
