@@ -22,6 +22,9 @@ struct sPoint2D
 	float x;
 	float y;
 	float length;
+	int tagInt;
+	string tag = "start";
+	olc::Pixel colour;
 };
 
 struct sSpline
@@ -142,12 +145,13 @@ struct sSpline
 		{
 			sPoint2D pos = GetSplinePoint(t);
 			pathFill.points[k] = pos;
+			pathFill.points[k].tag = "path";
 			k++;
 			gfx->Draw(pos.x, pos.y, p);
 		}
 	}
 
-	void DrawBoundariesSelf(olc::PixelGameEngine* gfx, sSpline pathFill, float fTrackWidth, olc::Pixel p)
+	void DrawBoundariesSelf(olc::PixelGameEngine* gfx, sSpline pathFill, float fTrackWidth, string boundary)
 	{
 		for (float t = 0; t < (float)points.size(); t += 1.0)
 		{
@@ -155,18 +159,57 @@ struct sSpline
 			sPoint2D g1 = pathFill.GetSplineGradient(t);
 			float glen = sqrtf(g1.x * g1.x + g1.y * g1.y);
 
-			if (p == olc::YELLOW)
+			if (boundary == "outside")
 			{
 				points[t].x = p1.x + fTrackWidth * (-g1.y / glen);
 				points[t].y = p1.y + fTrackWidth * (g1.x / glen);
+				if (points[t].tag == "start")
+				{
+					points[t].tag = "yellow";
+					points[t].tagInt = 0;
+					points[t].colour = olc::YELLOW;
+				}
 			}
-			else
+			else if (boundary == "inside")
 			{
 				points[t].x = p1.x - fTrackWidth * (-g1.y / glen);
 				points[t].y = p1.y - fTrackWidth * (g1.x / glen);
+				if (points[t].tag == "start")
+				{
+					points[t].tag = "blue";
+					points[t].tagInt = 0;
+					points[t].colour = olc::BLUE;
+				}
 			}
 
-			gfx->Draw(points[t].x, points[t].y, p);
+			if (points[t].tag == "big_orange")
+			{
+				for (int x = points[t].x - 1; x < points[t].x + 1; x++)
+					for (int y = points[t].y - 1; y < points[t].y + 1; y++)
+						gfx->Draw(x, y, points[t].colour);
+			}
+			else gfx->Draw(points[t].x, points[t].y, points[t].colour);
+		}
+	}
+
+	void switchColours(int coneIndex, olc::Pixel p)
+	{
+		switch (points[coneIndex].tagInt)
+		{
+			case 0:
+				points[coneIndex].tag = "orange";
+				points[coneIndex].colour = olc::ORANGE;
+				points[coneIndex].tagInt++;
+				break;
+			case 1:
+				points[coneIndex].tag = "big_orange";
+				points[coneIndex].tagInt++;
+				break;
+			case 2:
+				points[coneIndex].tag = "blue";
+				points[coneIndex].colour = p;
+				points[coneIndex].tagInt = 0;
+				break;
 		}
 	}
 };
@@ -188,6 +231,8 @@ private:
 	int nNodes = 15;	       // Number of red (controlable) nodes in spline
 	int nNodesSpline = 150;    // Number of total points in a spline
 	int nSelectedNode = -1;
+	int nSelectedOutsideCone, nSelectedInsideCone;
+
 	float fTrackWidth = 10.0f; // Width of the track
 
 	void exportToCSV()
@@ -199,6 +244,32 @@ private:
 		{
 			fout << pathFill.points[i].x << "," << pathFill.points[i].y << "," << trackOutside.points[i].x << "," << trackOutside.points[i].y
 				<< "," << trackInside.points[i].x << "," << trackInside.points[i].y << endl;
+		}
+
+		fout.close();
+	}
+
+	// Exports data to a CSV file in a format "tag,x,y"
+	void friendlyExportToCSV()
+	{
+		ofstream fout("data/data.csv");
+
+		fout << "tag" << "," << "x" << "," << "y" << endl;
+
+		for (int j = 0; j < 3; j++)
+		{
+			for (int i = 0; i < pathFill.points.size(); i++)
+			{
+				if (j == 0) {
+					fout << pathFill.points[i].tag << "," << pathFill.points[i].x << "," << pathFill.points[i].y << endl;
+				}
+				else if (j == 1) {
+					fout << trackOutside.points[i].tag << "," << trackOutside.points[i].x << "," << trackOutside.points[i].y << endl;
+				}
+				else {
+					fout << trackInside.points[i].tag << "," << trackInside.points[i].x << "," << trackInside.points[i].y << endl;
+				}
+			}
 		}
 
 		fout.close();
@@ -245,7 +316,7 @@ protected:
 					{
 						FillRect(240, 220, 10, 10, olc::DARK_RED);
 
-						exportToCSV();
+						friendlyExportToCSV();
 
 						olc_Terminate();
 					}
@@ -253,7 +324,7 @@ protected:
 			}
 		}
 
-		// Check if node is selected with mouse
+		// Check if a node is selected with mouse
 		if (GetMouse(0).bPressed)
 		{
 			for (int i = 0; i < path.points.size(); i++)
@@ -262,6 +333,27 @@ protected:
 				if (d < 5.0f)
 				{
 					nSelectedNode = i;
+					break;
+				}
+			}
+		}
+
+		// Check if a cone is selected with mouse and switch colours/sizes
+		if (GetMouse(1).bPressed)
+		{
+			for (int i = 0; i < pathFill.points.size(); i++)
+			{
+				float dInside = sqrtf(powf(trackInside.points[i].x - GetMouseX(), 2) + powf(trackInside.points[i].y - GetMouseY(), 2));
+				float dOutside = sqrtf(powf(trackOutside.points[i].x - GetMouseX(), 2) + powf(trackOutside.points[i].y - GetMouseY(), 2));
+
+				if (dInside < 2.0f)
+				{
+					trackInside.switchColours(i, olc::BLUE);
+					break;
+				}
+				else if (dOutside < 2.0f)
+				{
+					trackOutside.switchColours(i, olc::YELLOW);
 					break;
 				}
 			}
@@ -281,9 +373,10 @@ protected:
 		// Draw Track
 		path.DrawSelf(this);
 		path.DrawPathSelf(this, (float)nNodes / (float)nNodesSpline, pathFill);
-		trackInside.DrawBoundariesSelf(this, pathFill, fTrackWidth, olc::BLUE);
-		trackOutside.DrawBoundariesSelf(this, pathFill, fTrackWidth, olc::YELLOW);
+		trackInside.DrawBoundariesSelf(this, pathFill, fTrackWidth, "inside");
+		trackOutside.DrawBoundariesSelf(this, pathFill, fTrackWidth, "outside");
 
+		// Draw nodes as bigger red pixels
 		for (auto i : path.points)
 			FillPixels(i.x - 1, i.y - 1, i.x + 2, i.y + 2, olc::RED);
 
