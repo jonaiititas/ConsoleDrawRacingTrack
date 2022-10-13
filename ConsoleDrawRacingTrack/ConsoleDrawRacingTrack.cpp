@@ -227,12 +227,14 @@ public:
 
 private:
 	sSpline path, pathFill, trackInside, trackOutside;	// Various splines
+	sPoint2D car_p;
 
 	int nNodes = 15;	       // Number of red (controlable) nodes in spline
 	int nNodesSpline = 150;    // Number of total points in a spline
 	int nSelectedNode = -1;
 	int nSelectedOutsideCone, nSelectedInsideCone;
-
+	bool carSelected = false;
+	
 	float fTrackWidth = 10.0f; // Width of the track
 
 	void exportToCSV()
@@ -272,6 +274,8 @@ private:
 			}
 		}
 
+		fout << "car_start" << "," << car_p.x << "," << car_p.y << endl;
+
 		fout.close();
 	}
 
@@ -294,6 +298,11 @@ protected:
 		}
 
 		path.UpdateSplineProperties();
+
+		// Initialize car's starting position in the middle of the screen
+		car_p.x = 128;
+		car_p.y = 120;
+
 		return true;
 	}
 
@@ -324,7 +333,7 @@ protected:
 			}
 		}
 
-		// Check if a node is selected with mouse
+		// Check if a node or a car is selected with mouse
 		if (GetMouse(0).bPressed)
 		{
 			for (int i = 0; i < path.points.size(); i++)
@@ -336,6 +345,9 @@ protected:
 					break;
 				}
 			}
+
+			float dCar = sqrtf(powf(car_p.x - GetMouseX(), 2) + powf(car_p.y - GetMouseY(), 2));
+			if (dCar < 5.0f) carSelected = true;
 		}
 
 		// Check if a cone is selected with mouse and switch colours/sizes
@@ -360,21 +372,31 @@ protected:
 		}
 
 		if (GetMouse(0).bReleased)
+		{
 			nSelectedNode = -1;
-
-		// Move selected node
+			carSelected = false;
+		}
+			
+		// Move car or selected node
 		if (GetMouse(0).bHeld && nSelectedNode >= 0)
 		{
 			path.points[nSelectedNode].x = GetMouseX();
 			path.points[nSelectedNode].y = GetMouseY();
 			path.UpdateSplineProperties();
 		}
+		else if (carSelected == true)
+		{
+			car_p.x = GetMouseX();
+			car_p.y = GetMouseY();
+			FillPixels(car_p.x - 2, car_p.y - 2, car_p.x + 2, car_p.y + 2, olc::GREEN);
+		}
 
-		// Draw Track
+		// Draw track and the starting position of the car
 		path.DrawSelf(this);
 		path.DrawPathSelf(this, (float)nNodes / (float)nNodesSpline, pathFill);
 		trackInside.DrawBoundariesSelf(this, pathFill, fTrackWidth, "inside");
 		trackOutside.DrawBoundariesSelf(this, pathFill, fTrackWidth, "outside");
+		FillPixels(car_p.x - 2, car_p.y - 2, car_p.x + 2, car_p.y + 2, olc::GREEN);
 
 		// Draw nodes as bigger red pixels
 		for (auto i : path.points)
